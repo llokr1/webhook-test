@@ -1,10 +1,5 @@
 pipeline {
-    agent {
-        docker {
-            image 'eclipse-temurin:17-jdk' // JDK 17이 포함된 공식 이미지
-            args '-u root' // 필요 시 권한 문제 방지
-        }
-    }
+    agent any
 
     // 최소 옵션만 유지해 간단히 실행 가능하도록 합니다
     options {
@@ -14,10 +9,42 @@ pipeline {
     // 에이전트에 JDK(예: 17)가 설치되어 있어야 합니다.
 
     stages {
+        stage('Setup JDK 17') {
+            steps {
+                sh '''
+set -e
+ARCH=$(uname -m)
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+mkdir -p .jdk
+if [ ! -d .jdk/temurin-17 ]; then
+  cd .jdk
+  case "$OS-$ARCH" in
+    linux-aarch64) URL="https://github.com/adoptium/temurin17-binaries/releases/latest/download/OpenJDK17U-jdk_aarch64_linux_hotspot.tar.gz" ;;
+    linux-x86_64) URL="https://github.com/adoptium/temurin17-binaries/releases/latest/download/OpenJDK17U-jdk_x64_linux_hotspot.tar.gz" ;;
+    darwin-arm64) URL="https://github.com/adoptium/temurin17-binaries/releases/latest/download/OpenJDK17U-jdk_aarch64_mac_hotspot.tar.gz" ;;
+    darwin-x86_64) URL="https://github.com/adoptium/temurin17-binaries/releases/latest/download/OpenJDK17U-jdk_x64_mac_hotspot.tar.gz" ;;
+    *) echo "Unsupported platform: $OS-$ARCH"; exit 1 ;;
+  esac
+  echo "Downloading Temurin JDK 17 from $URL"
+  curl -fsSL "$URL" -o jdk.tar.gz
+  tar -xzf jdk.tar.gz
+  rm jdk.tar.gz
+  mv jdk-17* temurin-17
+fi
+'''
+            }
+        }
+
         stage('Build & Test') {
             steps {
-                sh 'chmod +x ./gradlew || true'
-                sh './gradlew --no-daemon clean build'
+                sh '''
+set -e
+export JAVA_HOME="$PWD/.jdk/temurin-17"
+export PATH="$JAVA_HOME/bin:$PATH"
+java -version
+chmod +x ./gradlew || true
+./gradlew --no-daemon -Dorg.gradle.java.installations.auto-download=false clean build
+'''
             }
         }
     }
