@@ -1,5 +1,10 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'eclipse-temurin:17-jdk' // JDK 17이 포함된 공식 이미지
+            args '-u root' // 필요 시 권한 문제 방지
+        }
+    }
 
     // 최소 옵션만 유지해 간단히 실행 가능하도록 합니다
     options {
@@ -12,7 +17,7 @@ pipeline {
         stage('Build & Test') {
             steps {
                 sh 'chmod +x ./gradlew || true'
-                sh './gradlew --no-daemon clean test'
+                sh './gradlew --no-daemon clean build'
             }
         }
     }
