@@ -3,21 +3,18 @@ pipeline {
 
     // 필요한 경우 ANSI 컬러 로그와 타임스탬프를 활성화합니다
     options {
-        ansiColor('xterm')
+        wrap([$class: 'AnsiColorBuildWrapper', colorMapName: 'xterm'])
         timestamps()
         buildDiscarder(logRotator(numToKeepStr: '20'))
     }
 
-    tools {
-        // Jenkins에 사전 등록된 JDK 이름을 지정하세요
-        // 예: 'JDK17' 또는 'temurin-17' 등
-        jdk 'JDK17' // TODO: Jenkins에 등록된 JDK 이름으로 변경하세요
-    }
-
-    environment {
-        // 필요 시 환경 변수를 설정하세요
-        // EXAMPLE_TOKEN = credentials('CRED_ID') // TODO: 필요 시 Jenkins Credentials ID 입력
-    }
+    // TODO: 에이전트에 JDK가 설치되어 있어야 합니다 (예: Java 17).
+    // Jenkins의 Global Tool로 JDK를 관리하고 싶다면 tools 블록을 추가하고, 등록된 이름을 사용하세요.
+    // 예)
+    // tools {
+    //     jdk 'YOUR_JDK_NAME'
+    // }
+    // 또는 stage 내에서 'tool' 스텝으로 JAVA_HOME을 설정한 뒤 'withEnv'로 PATH를 확장하세요.
 
     stages {
         stage('Checkout') {
@@ -65,16 +62,13 @@ pipeline {
             // 빌드 산출물(JAR) 보관
             archiveArtifacts artifacts: 'build/libs/*.jar', fingerprint: true, allowEmptyArchive: false
         }
-        cleanup {
-            // 필요 시 워크스페이스 정리 등
-            // deleteDir()
-        }
     }
 }
 
 // 사용 가이드
-// 1) tools.jdk 의 값('JDK17')을 Jenkins에 등록된 JDK 이름으로 바꾸세요.  // TODO
+// 1) 에이전트에 JDK(예: 17)가 설치되어 있는지 확인하세요.  // TODO
+//    Jenkins Global Tool을 사용할 경우 tools { jdk '등록된이름' } 블록을 추가하세요.
 // 2) Git 인증이 필요한 경우 Checkout 단계의 credentialsId, url을 알맞게 지정하세요.  // TODO
 // 3) Windows 에이전트에서는 sh 단계를 bat 단계로 바꾸세요.  // TODO
-// 4) 추가 환경변수가 필요하면 environment 블록을 편집하세요.  // TODO
+// 4) 추가 환경변수가 필요하면 각 stage 내에서 withEnv 또는 withCredentials를 사용하세요.  // TODO
 
