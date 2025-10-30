@@ -1,5 +1,5 @@
 pipeline {
-    // 1. 에이전트를 'any'로 변경 (Jenkins 기본 노드 사용)
+    // Jenkins 호스트 머신에서 실행
     agent any
 
     options {
@@ -9,28 +9,32 @@ pipeline {
     stages {
         stage('Build & Test') {
             steps {
-                // 2. steps 내부에서 Docker 컨테이너를 실행하여 빌드 격리
-                // 현재 작업 공간을 /app으로 마운트하고, 그 안에서 gradlew 명령 실행
+                echo 'Starting Dockerized Gradle Build...'
+
+                // sh 명령어를 사용하여 Docker 컨테이너 내부에서 빌드 실행
+                // Docker 호스트 소켓을 공유하여 컨테이너 내에서 Docker 명령을 실행할 수 있습니다.
                 sh """
+                    # 1. 실행 권한 부여
+                    chmod +x ./gradlew || true
+
+                    # 2. eclipse-temurin:17-jdk 컨테이너를 사용하여 빌드 및 테스트 실행
+                    # --rm: 종료 시 컨테이너 자동 삭제
+                    # -v \${PWD}:/app: 현재 Jenkins Workspace를 컨테이너의 /app 디렉토리로 마운트
+                    # -w /app: 컨테이너의 작업 디렉토리를 /app으로 설정
+                    # -u \$(id -u):\$(id -g): 호스트의 사용자/그룹 ID로 컨테이너 실행 (권한 문제 방지)
                     docker run --rm \\
                         -u \$(id -u):\$(id -g) \\
                         -v \${PWD}:/app \\
                         -w /app \\
                         eclipse-temurin:17-jdk \\
-                        sh -c 'chmod +x ./gradlew && ./gradlew --no-daemon clean build'
+                        sh -c './gradlew --no-daemon clean build'
                 """
             }
         }
     }
 
     post {
+        // 빌드 성공/실패 여부와 관계없이 실행
         always {
-            // 테스트 결과 수집 (JUnit) - 경로가 컨테이너 내부가 아닌 Jenkins Workspace 기준임을 유의
-            junit allowEmptyResults: true, testResults: 'build/test-results/test/*.xml'
-            archiveArtifacts artifacts: 'build/reports/tests/test/**', allowEmptyArchive: true
-        }
-        success {
-            archiveArtifacts artifacts: 'build/libs/*.jar', fingerprint: true, allowEmptyArchive: true
-        }
-    }
-}
+            echo 'Collecting Test Results and Artifacts...'
+            // 테스트 결과 수집 (
